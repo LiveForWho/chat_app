@@ -6,12 +6,12 @@ import { io, userSocketMap } from "../server.js";
 export const getUserForSideBar = async (req, res) => {
   try {
     const userId = req.user._id;
-    const filteredUsers = await User.find({ _id: { $en: userId } }).select(
+    const filteredUsers = await User.find({ _id: { $ne: userId } }).select(
       "-password"
     );
 
     //Count number of message not seen
-    const unseenMessage = {};
+    const unseenMessages = {};
     const promises = filteredUsers.map(async (user) => {
       const messages = await Message.find({
         senderId: user._id,
@@ -19,11 +19,11 @@ export const getUserForSideBar = async (req, res) => {
         seen: false,
       });
       if (messages.length > 0) {
-        unseenMessage[user._id] = messages.length;
+        unseenMessages[user._id.toString()] = messages.length;
       }
     });
     await Promise.all(promises);
-    res.json({ success: true, user: filteredUsers, unseenMessage });
+    res.json({ success: true, users: filteredUsers, unseenMessages });
   } catch (error) {
     console.log(error.message);
     res.json({ success: false, message: error.message });
@@ -82,9 +82,9 @@ export const sendMessage = async (req, res) => {
       image: imageUrl,
     });
     //Emit the new message to the receiver socket
-    const receiverSocketId = userSocketMap(receiverId);
+    const receiverSocketId = userSocketMap[receiverId];
     if (receiverSocketId) {
-      io.to(receiverId).emit("newMessage", newMessage);
+      io.to(receiverSocketId).emit("newMessage", newMessage);
     }
     res.json({ success: true, newMessage });
   } catch (error) {
